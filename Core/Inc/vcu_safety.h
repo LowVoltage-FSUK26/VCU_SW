@@ -26,6 +26,7 @@
  */
 
 #ifndef VCU_SAFETY_H
+
 #define VCU_SAFETY_H
 
 #ifdef __cplusplus

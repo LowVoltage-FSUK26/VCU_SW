@@ -1,0 +1,19 @@
+# Build folders
+Debug/
+Release/
+
+# Toolchain specific
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+# Static Analysis and temp files
+*.su
+*.cyclo
+.settings/
+.metadata/
+
+# CubeMX auto-generated backups
+*~

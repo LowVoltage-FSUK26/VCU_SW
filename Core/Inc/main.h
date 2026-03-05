@@ -83,6 +83,10 @@ void Error_Handler(void);
 #define SDC_SENSE_GPIO_Port GPIOA
 #define IMD_PWM_IN_T2C1_Pin GPIO_PIN_15
 #define IMD_PWM_IN_T2C1_GPIO_Port GPIOA
+#define FAN_BATTERY_Pin GPIO_PIN_6
+#define FAN_BATTERY_GPIO_Port GPIOB
+#define FAN_MOTOR_Pin GPIO_PIN_7
+#define FAN_MOTOR_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

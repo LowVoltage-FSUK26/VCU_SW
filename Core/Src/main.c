@@ -592,7 +592,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(FAULT_LED_GPIO_Port, FAULT_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, BRAKE_LIGHT_Pin|DRIVE_ENABLE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, BRAKE_LIGHT_Pin|DRIVE_ENABLE_Pin|FAN_BATTERY_Pin|FAN_MOTOR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : CAN_HEART_LED_Pin */
   GPIO_InitStruct.Pin = CAN_HEART_LED_Pin;
@@ -614,8 +614,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(IMD_OKHS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : BRAKE_LIGHT_Pin DRIVE_ENABLE_Pin */
-  GPIO_InitStruct.Pin = BRAKE_LIGHT_Pin|DRIVE_ENABLE_Pin;
+  /*Configure GPIO pins : BRAKE_LIGHT_Pin DRIVE_ENABLE_Pin FAN_BATTERY_Pin FAN_MOTOR_Pin */
+  GPIO_InitStruct.Pin = BRAKE_LIGHT_Pin|DRIVE_ENABLE_Pin|FAN_BATTERY_Pin|FAN_MOTOR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

@@ -51,7 +51,7 @@ void vCanDecodeTask(void *pvParameters)
         if (xQueueReceive(xCanRxQueue, &rxMsg, portMAX_DELAY) == pdTRUE)
         {
             /* Visual heartbeat on onboard LED (PC13, active-LOW on Blue Pill). */
-            HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+            HAL_GPIO_TogglePin(CAN_HEART_LED_GPIO_Port, CAN_HEART_LED_Pin);
 
             /*
              * DTI packet type = upper 6 bits of the 11-bit Standard ID.

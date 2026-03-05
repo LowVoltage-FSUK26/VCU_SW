@@ -397,11 +397,11 @@ void vBrakeLightTask(void *argument)
                         is_calibrated = 1;
 
                         /* Visual confirmation: 200 ms brake-light flash. */
-                        HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_PORT,
-                                          BRAKE_LIGHT_GPIO_PIN, GPIO_PIN_SET);
+                        HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_Port,
+                                          BRAKE_LIGHT_Pin, GPIO_PIN_SET);
                         vTaskDelay(pdMS_TO_TICKS(200));
-                        HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_PORT,
-                                          BRAKE_LIGHT_GPIO_PIN, GPIO_PIN_RESET);
+                        HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_Port,
+                                          BRAKE_LIGHT_Pin, GPIO_PIN_RESET);
                     }
                     vTaskDelay(pdMS_TO_TICKS(10));
                     continue; /* Skip brake-light logic until calibrated. */
@@ -447,22 +447,22 @@ void vBrakeLightTask(void *argument)
 
                 if (hydraulic_active)
                 {
-                    HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_PORT,
-                                      BRAKE_LIGHT_GPIO_PIN, GPIO_PIN_SET);
+                    HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_Port,
+                                      BRAKE_LIGHT_Pin, GPIO_PIN_SET);
                     vcu_data.brake_light_active = 1;
                     strcpy((char *)vcu_data.trigger_source, "HYDRAULIC");
                 }
                 else if (regen_active)
                 {
-                    HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_PORT,
-                                      BRAKE_LIGHT_GPIO_PIN, GPIO_PIN_SET);
+                    HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_Port,
+                                      BRAKE_LIGHT_Pin, GPIO_PIN_SET);
                     vcu_data.brake_light_active = 1;
                     strcpy((char *)vcu_data.trigger_source, "REGEN_DECEL");
                 }
                 else
                 {
-                    HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_PORT,
-                                      BRAKE_LIGHT_GPIO_PIN, GPIO_PIN_RESET);
+                    HAL_GPIO_WritePin(BRAKE_LIGHT_GPIO_Port,
+                                      BRAKE_LIGHT_Pin, GPIO_PIN_RESET);
                     vcu_data.brake_light_active = 0;
                     strcpy((char *)vcu_data.trigger_source, "NONE");
                 }
@@ -540,7 +540,7 @@ void vR2DLogicTask(void *argument)
      * here again as a belt-and-suspenders measure. On any reset or watchdog
      * reboot this guarantees the inverter cannot be accidentally enabled.
      * --------------------------------------------------------------------- */
-    HAL_GPIO_WritePin(DRIVE_ENABLE_GPIO_PORT, DRIVE_ENABLE_GPIO_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(DRIVE_ENABLE_GPIO_Port, DRIVE_ENABLE_Pin, GPIO_PIN_RESET);
     vcu_data.ready_to_drive_active = 0;
 
     /* Buzzer must be silent on startup. */
@@ -552,7 +552,7 @@ void vR2DLogicTask(void *argument)
          * 1. READ INPUTS
          * ------------------------------------------------------------------ */
         uint8_t btn_pressed =
-            (HAL_GPIO_ReadPin(RTD_BUTTON_GPIO_PORT, RTD_BUTTON_GPIO_PIN) == GPIO_PIN_SET);
+            (HAL_GPIO_ReadPin(RTD_BUTTON_GPIO_Port, RTD_BUTTON_Pin) == GPIO_PIN_SET);
 
         uint8_t brake_pressed =
             (vcu_data.adc_raw_pressure > HYDRAULIC_PRESS_THRESHOLD);
@@ -566,7 +566,7 @@ void vR2DLogicTask(void *argument)
          * treats this identically to a real SDC opening (fail-safe direction).
          */
         uint8_t sdc_closed =
-            (HAL_GPIO_ReadPin(SDC_SENSE_GPIO_PORT, SDC_SENSE_GPIO_PIN) == GPIO_PIN_SET);
+            (HAL_GPIO_ReadPin(SDC_SENSE_GPIO_Port, SDC_SENSE_Pin) == GPIO_PIN_SET);
         vcu_data.shutdown_circuit_open = !sdc_closed;
 
         /* Expose raw button state for live-watch / telemetry debugging. */
@@ -605,8 +605,8 @@ void vR2DLogicTask(void *argument)
             if (vcu_data.ready_to_drive_active == 1)
             {
                 /* Kill inverter immediately. */
-                HAL_GPIO_WritePin(DRIVE_ENABLE_GPIO_PORT,
-                                  DRIVE_ENABLE_GPIO_PIN, GPIO_PIN_RESET);
+                HAL_GPIO_WritePin(DRIVE_ENABLE_GPIO_Port,
+                                  DRIVE_ENABLE_Pin, GPIO_PIN_RESET);
                 vcu_data.ready_to_drive_active = 0;
             }
             /* Stay in this fault-holding loop until the fault is cleared.  */
@@ -686,8 +686,8 @@ void vR2DLogicTask(void *argument)
                  * The DTI will now accept torque commands from its analog
                  * pedal inputs (or CAN if configured).
                  * --------------------------------------------------------- */
-                HAL_GPIO_WritePin(DRIVE_ENABLE_GPIO_PORT,
-                                  DRIVE_ENABLE_GPIO_PIN, GPIO_PIN_SET);
+                HAL_GPIO_WritePin(DRIVE_ENABLE_GPIO_Port,
+                                  DRIVE_ENABLE_Pin, GPIO_PIN_SET);
                 vcu_data.ready_to_drive_active = 1;
             }
             /* else: conditions not met – remain in standby silently. */

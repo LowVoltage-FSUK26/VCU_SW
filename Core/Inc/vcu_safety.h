@@ -82,41 +82,31 @@ extern "C" {
 #define APPS2_MIN_ADC   0
 #define APPS2_MAX_ADC   4000
 
-/* --- R2D hardware mapping ------------------------------------------------ */
-/** RTD button input – PB14, internal pull-down, button → 3.3 V.           */
-#define RTD_BUTTON_GPIO_PORT   GPIOB
-#define RTD_BUTTON_GPIO_PIN    GPIO_PIN_14
-
-/** Drive Enable output – PB15, active HIGH, drives inverter ENABLE line.  */
-#define DRIVE_ENABLE_GPIO_PORT GPIOB
-#define DRIVE_ENABLE_GPIO_PIN  GPIO_PIN_15
-
-/**
- * Rule EV4.11.8 – Shutdown Circuit (SDC) sense input.
+/* --- R2D / SAFETY PIN MAPPING --------------------------------------------
  *
- * The SDC is a hardware safety loop. When the loop is CLOSED (normal running
- * condition), the upstream SDC node actively drives this pin HIGH (3.3 V),
- * overriding the internal pull-down → GPIO reads HIGH → SDC closed.
+ * NO hardcoded GPIO defines here. All pin assignments are owned by the
+ * STM32CubeIDE .ioc file and auto-generated into main.h as:
  *
- * When the SDC OPENS (any safety device trips: IMD, BMS, emergency stop, etc.),
- * the pin is no longer driven HIGH. The internal pull-DOWN resistor pulls the
- * pin to GND → GPIO reads LOW → SDC open → DRIVE_ENABLE immediately LOW.
+ *   #define <LABEL>_Pin         GPIO_PIN_x
+ *   #define <LABEL>_GPIO_Port   GPIOy
  *
- * FAIL-SAFE WIRING PROPERTY:
- *   A broken or disconnected sense wire also floats LOW via the pull-down,
- *   which the VCU treats identically to a real SDC opening. A wiring fault
- *   therefore always drives the system into the safe state — it cannot
- *   accidentally keep the inverter enabled.
+ * This module uses those generated names directly. Never redeclare them here —
+ * doing so risks silently overriding the .ioc value with a stale constant.
  *
- * Pin: PA9 — input with internal pull-DOWN (GPIO_PULLDOWN).
- *   *** CONFIRM THIS PIN AGAINST YOUR PCB BEFORE FLASHING ***
- */
-#define SDC_SENSE_GPIO_PORT    GPIOA
-#define SDC_SENSE_GPIO_PIN     GPIO_PIN_9
-
-/** Brake light output – PB12, active HIGH.                                 */
-#define BRAKE_LIGHT_GPIO_PORT  GPIOB
-#define BRAKE_LIGHT_GPIO_PIN   GPIO_PIN_12
+ * Current pin assignments (from .ioc — update comment here if .ioc changes):
+ *   RTD_BUTTON   → PB14   input,  GPIO_PULLDOWN
+ *   DRIVE_ENABLE → PB15   output, active HIGH
+ *   SDC_SENSE    → PA9    input,  GPIO_PULLDOWN  (Rule EV4.11.8)
+ *   BRAKE_LIGHT  → PB12   output, active HIGH
+ *   FAULT_LED    → PA1    output, active HIGH
+ *
+ * SDC_SENSE pull-down rationale (Rule EV4.11.8):
+ *   SDC closed (normal) → upstream circuit drives PA9 HIGH → VCU reads HIGH.
+ *   SDC open   (fault)  → PA9 floats → pull-DOWN pulls to GND → VCU reads LOW
+ *                       → DRIVE_ENABLE immediately pulled LOW.
+ *   Broken sense wire   → PA9 floats → pull-DOWN → LOW → same safe response.
+ *   A wiring fault cannot hold the inverter enabled.
+ * ----------------------------------------------------------------------- */
 
 /**
  * Rule EV4.12.1 – RTD sound: "continuously for at least 1 s and a

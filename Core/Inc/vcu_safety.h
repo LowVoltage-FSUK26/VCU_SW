@@ -6,7 +6,12 @@
  *  This module owns three safety-critical functions:
  *
  *  1. APPS PLAUSIBILITY (Process_APPS_Safety_Logic)
- *     Implements Rules T11.8.8 / T11.8.9 – redundant pedal sensor checking.
+ *     Implements Rules T11.8.5 / T11.8.8 / T11.8.9 – redundant pedal sensor
+ *     checking. T11.8.5 mandates at least two independent APPS sensors.
+ *     T11.8.9 defines implausibility as >10 percentage points deviation between
+ *     any two used APPSs, or any failure per T11.9. T11.8.8 mandates that if
+ *     implausibility persists for more than 100 ms, motor power must be shut
+ *     down immediately.
  *
  *  2. BRAKE LIGHT CONTROLLER & IMU (vBrakeLightTask)
  *     Implements Rule T6.3.1 – brake light must activate on hydraulic brake
@@ -44,26 +49,43 @@ extern "C" {
  * without hunting through task implementations.
  * ========================================================================= */
 
-/** Rule T11.8.8/T11.8.9 – APPS implausibility threshold (10% of full scale). */
+/** Rule T11.8.9 – APPS implausibility threshold: deviation > 10 percentage
+ *  points of pedal travel between any two APPSs triggers implausibility.    */
 #define APPS_IMPLAUSIBILITY_THRESHOLD   0.10f
 
-/** Rule T11.8.9 – Grace period before torque cut [ms]. Must be > 100 ms. */
+/** Rule T11.8.8 – Maximum grace period before torque cut [ms].
+ *  T11.8.8 requires power to be shut down if implausibility persists for
+ *  MORE THAN 100 ms. This value must NOT exceed 100 ms. Reducing it is
+ *  always safe; increasing it beyond 100 ms is non-compliant.               */
 #define APPS_CONFLICT_TIMER_MS          100U
 
-/** Rule EV2.3.1 – Simultaneous brake+throttle (> 25%) threshold [%].      */
+/** Rule EV2.3.1 – Simultaneous brake + throttle threshold [%].
+ *  EV2.3.1 triggers if mechanical brakes are actuated AND the APPS signals
+ *  pedal travel equivalent to >25% desired motor torque OR >5 kW, whichever
+ *  is lower, simultaneously for longer than 500 ms.
+ *  WARNING: On motors with lower power ratings the 5 kW threshold may be the
+ *  binding condition at a throttle position below 25%. Verify the effective
+ *  trip point for the installed motor before relying on this define alone.   */
 #define BRAKE_PLAUSIBILITY_THRESHOLD    25.0f
 
-/** Rule EV2.3.1 – Brake plausibility persist time before torque cut [ms].  */
+/** Rule EV2.3.1 – Brake plausibility persist time before torque cut [ms].
+ *  Condition must be present for MORE THAN 500 ms before the latch engages.  */
 #define BRAKE_PLAUSIBILITY_TIMER_MS     500U
 
-/** Rule EV2.3.2 – APPS must fall below 5% before torque is restored [%].  */
+/** Rule EV2.3.2 – APPS must fall below 5% AND desired motor torque must be
+ *  0 Nm before torque is restored (regardless of brake pedal state) [%].
+ *  Both conditions must be satisfied simultaneously to release the latch.    */
 #define BRAKE_RESET_THRESHOLD           5.0f
 
 /** Hydraulic brake detection raw ADC threshold (~0.1 V on 12-bit ADC).    */
 #define HYDRAULIC_PRESS_THRESHOLD       50U
 
 /** Rule T6.3.1 – Regen deceleration threshold for brake light [g].
- *  1.0 m/s² = 0.102g.  Hysteresis prevents rapid toggling.                */
+ *  1.0 m/s² = 0.102g. T6.3.1 specifies this threshold as 1 m/s² ± 0.3 m/s²,
+ *  meaning any value between 0.7 m/s² (0.071 g) and 1.3 m/s² (0.133 g) is
+ *  compliant. The current value of 0.102 g (1.0 m/s²) sits in the middle of
+ *  the allowed band. Do not set this above 0.133 g or below 0.071 g.
+ *  Hysteresis prevents rapid toggling near the threshold.                    */
 #define BRAKE_DECEL_THRESHOLD_G         0.102f
 #define BRAKE_DECEL_HYSTERESIS_G        0.020f
 
@@ -206,9 +228,23 @@ void MPU6050_Init(void);
  * @brief  APPS dual-sensor plausibility check + brake plausibility check.
  *
  *  Rules enforced:
- *    T11.8.8 / T11.8.9 – dual APPS agreement within 10 % for > 100 ms.
- *    EV2.3.1            – simultaneous brake + APPS > 25 % for > 500 ms.
- *    EV2.3.2            – brake latch released only when APPS < 5 %.
+ *    T11.8.5            – At least two independent APPS required.
+ *    T11.8.9            – Implausibility defined as >10 pp deviation between
+ *                         any two APPSs, or any failure per T11.9.
+ *    T11.8.8            – Motor power must be shut down immediately if
+ *                         implausibility persists for more than 100 ms.
+ *    T11.9              – APPS are System Critical Signals; open circuit,
+ *                         short to ground, short to supply, and out-of-range
+ *                         signals must all result in a safe state. The inverse-
+ *                         wiring scheme ensures T11.9 failures cause immediate
+ *                         >10 pp disagreement. See T11.9.7: ESF must document
+ *                         all potential failure modes and detection strategies.
+ *    EV2.3.1            – Commanded torque must be 0 Nm if brakes are actuated
+ *                         AND APPS signals >25% torque or >5 kW (whichever is
+ *                         lower) simultaneously for longer than 500 ms.
+ *    EV2.3.2            – Torque must remain 0 Nm until APPS signals <5% pedal
+ *                         travel AND desired motor torque is 0 Nm, regardless
+ *                         of whether brakes are still actuated.
  *
  * @note   Called from vBrakeLightTask every 10 ms. Must be < 1 ms execution.
  */

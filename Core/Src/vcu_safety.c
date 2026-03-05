@@ -6,33 +6,47 @@
  *  ╔══════════════════════════════════════════════════════════════════════╗
  *  ║   FORMULA STUDENT UK 2026 – RULE REFERENCE SUMMARY                  ║
  *  ║                                                                      ║
- *  ║  T11.8.8 / T11.8.9  APPS Implausibility                             ║
- *  ║    The plausibility check must verify that the two APPS signals      ║
- *  ║    agree within 10 % of the pedal travel. If they disagree for      ║
- *  ║    more than 100 ms, the power to the motor(s) must be cut and      ║
- *  ║    remain cut until the plausibility is restored AND the throttle   ║
- *  ║    pedal is fully released.                                          ║
+ *  ║  T11.8.5  Dual APPS Requirement                                      ║
+ *  ║    At least two separate sensors must be used as APPSs. Separate     ║
+ *  ║    is defined as not sharing supply or signal lines.                  ║
  *  ║                                                                      ║
- *  ║  EV2.3.1  Brake Plausibility Check                                  ║
- *  ║    If the mechanical brakes are actuated AND the APPS signals more  ║
- *  ║    than 25 % throttle simultaneously, for more than 500 ms,        ║
- *  ║    the motor torque output must be set to zero.                      ║
+ *  ║  T11.8.9  APPS Implausibility Definition                             ║
+ *  ║    Implausibility = deviation of more than 10 percentage points of   ║
+ *  ║    pedal travel between any two APPSs, or any failure per T11.9.    ║
  *  ║                                                                      ║
- *  ║  EV2.3.2  Brake Plausibility Reset                                  ║
- *  ║    Torque must remain zero until the driver releases the throttle   ║
- *  ║    to less than 5 % of full travel.                                  ║
+ *  ║  T11.8.8  APPS Implausibility Shutdown Timer                         ║
+ *  ║    If implausibility persists for more than 100 ms, the power to    ║
+ *  ║    the motor(s) must be immediately shut down completely.            ║
  *  ║                                                                      ║
- *  ║  T6.3.1   Brake Light                                               ║
- *  ║    The brake light must be illuminated when the mechanical brakes   ║
- *  ║    are actuated OR when regen deceleration exceeds 1.0 m/s²        ║
- *  ║    (~0.102 g).                                                       ║
+ *  ║  T11.9    System Critical Signals                                    ║
+ *  ║    APPS are System Critical Signals. Open circuit, short to ground,  ║
+ *  ║    short to supply, and out-of-range failures must all result in a   ║
+ *  ║    safe state. T11.9.7 requires the ESF to document all failure      ║
+ *  ║    modes, detection strategies, and test evidence.                   ║
  *  ║                                                                      ║
- *  ║  EV4.11.7 Ready-to-Drive Activation                                 ║
+ *  ║  EV2.3.1  Brake Plausibility Check                                   ║
+ *  ║    If mechanical brakes are actuated AND the APPS signals pedal      ║
+ *  ║    travel equivalent to >25% desired motor torque OR >5 kW,         ║
+ *  ║    whichever is lower, simultaneously for more than 500 ms,         ║
+ *  ║    the commanded motor torque must be 0 Nm.                          ║
+ *  ║                                                                      ║
+ *  ║  EV2.3.2  Brake Plausibility Reset                                   ║
+ *  ║    Torque must remain 0 Nm until APPS signals <5% pedal travel AND  ║
+ *  ║    desired motor torque is 0 Nm, regardless of brake pedal state.   ║
+ *  ║                                                                      ║
+ *  ║  T6.3.1   Brake Light                                                ║
+ *  ║    The brake light must be illuminated when:                         ║
+ *  ║      (a) The hydraulic brake system is actuated, OR                  ║
+ *  ║      (b) The regenerative braking system is actuated per T6.1.10,   ║
+ *  ║      (c) Regen is actuated on accelerator release and deceleration   ║
+ *  ║          exceeds 1 m/s² ± 0.3 m/s².                                 ║
+ *  ║                                                                      ║
+ *  ║  EV4.11.7 Ready-to-Drive Activation                                  ║
  *  ║    Transition to R2D mode must only be possible during actuation    ║
  *  ║    of the mechanical brakes AND a simultaneous dedicated additional ║
- *  ║    action (a dedicated start button is used here).                  ║
+ *  ║    action (a dedicated start button is used here).                   ║
  *  ║                                                                      ║
- *  ║  EV4.12.1 Ready-to-Drive Sound                                      ║
+ *  ║  EV4.12.1 Ready-to-Drive Sound                                       ║
  *  ║    The vehicle must emit a characteristic sound continuously for    ║
  *  ║    at least 1 s and a maximum of 3 s while entering R2D.           ║
  *  ╚══════════════════════════════════════════════════════════════════════╝
@@ -95,21 +109,26 @@ void MPU6050_Init(void)
  * APPS PLAUSIBILITY LOGIC
  * ============================================================================
  *
- * WHY TWO SENSORS?
- *   FSUK T11.8.8 mandates two independent APPS (Accelerator Pedal Position
- *   Sensors) for redundancy. If one sensor fails (open, short, or out of range)
- *   the second will disagree by more than 10%, triggering a torque cut.
+ * WHY TWO SENSORS? (T11.8.5)
+ *   FSUK T11.8.5 mandates at least two independent APPS for redundancy.
+ *   Separate means they must not share supply or signal lines. If one sensor
+ *   fails (open, short, or out of range — all failure modes per T11.9) the
+ *   second will disagree by more than 10 pp, triggering a torque cut.
  *
- * WHY THE 100 ms GRACE PERIOD? (T11.8.9)
+ * WHY THE 100 ms GRACE PERIOD? (T11.8.8)
  *   Signal glitches, connector vibration, and ADC noise can cause brief
  *   transient disagreements. The 100 ms window prevents nuisance trips from
  *   short-duration noise while still cutting power on real sensor failures.
+ *   T11.8.8 requires shutdown when implausibility persists for MORE THAN
+ *   100 ms; this timer must never be increased beyond 100 ms.
  *
- * WHY INVERT APPS2? (INVERSE CHARACTERISTIC)
+ * WHY INVERT APPS2? (INVERSE CHARACTERISTIC — T11.9)
  *   The second sensor is wired inverse to the first (val2 = 1 - normalised_raw)
  *   so that a wiring fault (open or short) on either sensor causes the two
- *   channels to read opposites (0% vs 100%) – guaranteeing the 10% threshold
- *   is exceeded immediately, triggering the safety cut.
+ *   channels to read opposites (0% vs 100%) — guaranteeing the 10 pp threshold
+ *   defined in T11.9 (implausibility due to out-of-range signals) is exceeded
+ *   immediately, triggering the T11.8.8 safety cut. T11.9.7 requires the ESF
+ *   to document these failure modes and the detection strategy used here.
  *
  * ========================================================================= */
 void Process_APPS_Safety_Logic(void)
@@ -169,13 +188,14 @@ void Process_APPS_Safety_Logic(void)
     vcu_data.apps_percent  = (vcu_data.apps1_percent + vcu_data.apps2_percent) / 2.0f;
 
     /* ================================================================
-     * STEP 3 – IMPLAUSIBILITY CHECK (Rules T11.8.8 / T11.8.9)
+     * STEP 3 – IMPLAUSIBILITY CHECK (Rules T11.8.9 / T11.8.8)
      *
-     * T11.8.8: "The two APPS signals must agree within 10 % of pedal
-     *           travel at all times during operation."
+     * T11.8.9: Implausibility is defined as a deviation of more than
+     *          ten percentage points of pedal travel between any of
+     *          the used APPSs, or any failure according to T11.9.
      *
-     * T11.8.9: "The motor power must be immediately shut down if the
-     *           disagreement persists for more than 100 ms."
+     * T11.8.8: If implausibility persists for more than 100 ms, the
+     *          power to the motor(s) must be immediately shut down.
      *
      * Algorithm:
      *   - Compute absolute deviation between both normalised channels.
@@ -184,7 +204,7 @@ void Process_APPS_Safety_Logic(void)
      *   - If deviation persists > APPS_CONFLICT_TIMER_MS (100 ms):
      *       → set apps_fault_active = 1, zero torque, illuminate LED.
      *       → RETURN immediately (skip all further checks).
-     *   - Fault is cleared when deviation returns to within 10 %.
+     *   - Fault is cleared when deviation returns to within 10 pp.
      *     (Note: some interpretations require pedal release too –
      *      check with your scrutineer before modifying.)
      * ================================================================ */
@@ -201,8 +221,9 @@ void Process_APPS_Safety_Logic(void)
         else if ((HAL_GetTick() - apps_conflict_timer_start) > APPS_CONFLICT_TIMER_MS)
         {
             /*
-             * Fault confirmed – 100 ms has elapsed with >10 % deviation.
-             * Rule T11.8.9: illuminate fault LED. The R2D supervisor will
+             * Fault confirmed – 100 ms has elapsed with >10 pp deviation.
+             * Rule T11.8.8: motor power must be immediately shut down.
+             * Illuminate fault LED. The R2D supervisor will
              * detect apps_fault_active and pull DRIVE_ENABLE LOW immediately.
              */
             vcu_data.apps_fault_active = 1;
@@ -222,12 +243,20 @@ void Process_APPS_Safety_Logic(void)
     /* ================================================================
      * STEP 4 – BRAKE PLAUSIBILITY CHECK (Rules EV2.3.1 / EV2.3.2)
      *
-     * EV2.3.1: "If the mechanical brakes are actuated AND the APPS
-     *           indicate more than 25 % simultaneously for more than
-     *           500 ms, the torque demand must be set to zero."
+     * EV2.3.1: The commanded motor torque must be 0 Nm if mechanical
+     *          brakes are actuated AND the APPS signals pedal travel
+     *          equivalent to >25% desired motor torque OR >5 kW,
+     *          whichever is lower, at the same time, for longer than
+     *          500 ms.
+     *          NOTE: If the installed motor's power rating means that
+     *          5 kW corresponds to a throttle position below 25%, the
+     *          5 kW limit is the binding threshold. Verify this for the
+     *          installed motor before assuming 25% is always the trip.
      *
-     * EV2.3.2: "The torque must remain zero until the APPS returns
-     *           below 5 % (not just until the brake is released)."
+     * EV2.3.2: The commanded motor torque must remain at 0 Nm until
+     *          the APPS signals less than 5% pedal travel AND the
+     *          desired motor torque is 0 Nm, regardless of whether the
+     *          brakes are still actuated or not.
      *
      * WHY A 500 ms TIMER? (EV2.3.1)
      *   Hard braking combined with heel-toe or cadence-braking
@@ -239,8 +268,8 @@ void Process_APPS_Safety_Logic(void)
      *   If the brake plausibility was simply edge-triggered, a driver
      *   could release and re-press the brake to restore torque while
      *   the throttle is still stuck open. The latch forces the driver
-     *   to visibly return the throttle to idle before torque returns,
-     *   making the fault obvious.
+     *   to visibly return the throttle to idle (and torque demand to
+     *   0 Nm) before torque returns, making the fault obvious.
      * ================================================================ */
     float   avg_throttle  = vcu_data.apps_percent;
     uint8_t brake_is_hard = (vcu_data.adc_raw_pressure > HYDRAULIC_PRESS_THRESHOLD);
@@ -282,7 +311,14 @@ void Process_APPS_Safety_Logic(void)
     {
         /*
          * Rule EV2.3.2 – Latched. The R2D supervisor holds DRIVE_ENABLE LOW.
-         * Only the throttle returning below 5 % clears this latch.
+         * Both conditions must be satisfied simultaneously to release the latch:
+         *   (a) APPS signals less than 5% pedal travel (BRAKE_RESET_THRESHOLD), AND
+         *   (b) Desired motor torque is 0 Nm.
+         * Because the VCU does not command torque directly (the DTI manages its
+         * own pedal map), condition (b) is implied when condition (a) is met —
+         * a throttle reading below 5% means no torque is being requested.
+         * If this module is extended to command torque explicitly, both
+         * conditions must be checked independently before clearing the latch.
          */
         if (avg_throttle < BRAKE_RESET_THRESHOLD)
         {
@@ -307,14 +343,16 @@ void Process_APPS_Safety_Logic(void)
  *  Execution rate: 100 Hz (10 ms period) – driven by DMA completion notify.
  *
  *  Rule T6.3.1 – Brake Light:
- *    "The brake light must be illuminated when the hydraulic brakes are
- *     actuated OR when regen deceleration exceeds 1.0 m/s² (~0.102 g)."
+ *    The brake light must be illuminated if and only if one of:
+ *    (a) The hydraulic brake system is actuated.
+ *    (b) The regenerative braking system is actuated in accordance with T6.1.10.
+ *    (c) The regenerative braking system is actuated on accelerator release
+ *        and deceleration exceeds 1 m/s² ± 0.3 m/s² (~0.102 g nominal).
  *
- *  Why two triggers?
- *    Formula Student EVs can decelerate significantly through regenerative
- *    braking without any hydraulic pressure. A following driver or marshal
- *    has no visual cue unless the regen deceleration also activates the
- *    brake light. This is why T6.3.1 explicitly includes both conditions.
+ *  This implementation detects conditions (a) and (c) directly via the brake
+ *  pressure ADC and IMU respectively. Condition (b) — T6.1.10 regen actuation
+ *  — is subsumed by condition (c) in this architecture because the DTI manages
+ *  regen internally; the VCU detects regen by its deceleration effect via IMU.
  *
  *  IMU calibration:
  *    The MPU-6050 Y-axis is used for longitudinal deceleration. On a flat
@@ -359,7 +397,8 @@ void vBrakeLightTask(void *argument)
 
                 /* --------------------------------------------------------
                  * B. APPS + BRAKE PLAUSIBILITY SAFETY CHECKS
-                 *    Rules: T11.8.8 / T11.8.9 / EV2.3.1 / EV2.3.2
+                 *    Rules: T11.8.5 / T11.8.9 / T11.8.8 / T11.9
+                 *           EV2.3.1 / EV2.3.2
                  * ------------------------------------------------------- */
                 Process_APPS_Safety_Logic();
 
@@ -416,16 +455,22 @@ void vBrakeLightTask(void *argument)
                 /* --------------------------------------------------------
                  * F. BRAKE LIGHT DECISION  (Rule T6.3.1)
                  *
-                 *  T6.3.1: Illuminate if:
-                 *    (a) hydraulic brake is actuated, OR
-                 *    (b) regen deceleration exceeds 1.0 m/s² (~0.102 g).
+                 *  T6.3.1 requires illumination for any of:
+                 *    (a) Hydraulic brake actuated.
+                 *    (b) Regen braking actuated per T6.1.10.
+                 *    (c) Regen on accelerator release with decel >1 m/s²
+                 *        ±0.3 m/s² (0.071 g to 0.133 g; nominal 0.102 g).
+                 *
+                 *  Conditions (b) and (c) are both detected via IMU here:
+                 *  the VCU cannot directly observe the DTI's regen command,
+                 *  so it infers regen from measured deceleration while the
+                 *  throttle is at idle (APPS below APPS_DEADZONE_PERCENT).
                  *
                  *  Hysteresis of 0.02 g prevents rapid flickering near
-                 *  the threshold (a brake light that flickers at low regen
-                 *  would confuse following drivers and fail scrutineering).
+                 *  the threshold.
                  *
                  *  Priority: hydraulic check first (immediate physical input).
-                 *  Regen check second (derived from IMU).
+                 *  Regen/decel check second (derived from IMU).
                  * ------------------------------------------------------- */
                 uint8_t hydraulic_active =
                     (vcu_data.adc_raw_pressure > HYDRAULIC_PRESS_THRESHOLD);
@@ -580,8 +625,9 @@ void vR2DLogicTask(void *argument)
          *        DRIVE_ENABLE is pulled LOW immediately. This is not debounced
          *        and has no grace period – the response must be instantaneous.
          *
-         *  (b) Rules T11.8.8 / T11.8.9 – APPS implausibility:
-         *        Both APPS sensors disagree by > 10% for > 100 ms.
+         *  (b) Rules T11.8.9 / T11.8.8 – APPS implausibility:
+         *        T11.8.9: >10 pp deviation between the two APPSs (or T11.9
+         *        failure). T11.8.8: power shut down after > 100 ms persists.
          *        apps_fault_active flag set by Process_APPS_Safety_Logic.
          *
          *  (c) Rules EV2.3.1 / EV2.3.2 – Brake plausibility latch:
@@ -676,7 +722,13 @@ void vR2DLogicTask(void *argument)
                 __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
 
                 /* -----------------------------------------------------------
-                 * ENABLE INVERTER  (Rule EV4.11.6)
+                 * ENABLE INVERTER
+                 *
+                 * EV4.11.6 defines ready-to-drive as the state in which the
+                 * motor(s) will respond to APPS input. Pulling DRIVE_ENABLE
+                 * HIGH here is what satisfies that definition — the vehicle
+                 * now enters ready-to-drive mode as defined by EV4.11.6.
+                 * The authorising gate (brake + button) was EV4.11.7 above.
                  *
                  * Drive Enable (PB15) pulled HIGH → DTI inverter enabled.
                  * The DTI manages its own torque curves and pedal mapping

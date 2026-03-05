@@ -73,7 +73,10 @@ extern "C" {
 /** IMU low-pass filter coefficient.                                         */
 #define ACCEL_FILTER_ALPHA              0.1f
 
-/** Throttle deadzone – torque not requested below this value [%].          */
+/** Throttle deadzone for regen brake light detection [%].
+ *  If both APPS sensors read below this value the driver is not pressing the
+ *  throttle. Used only to qualify the IMU-based regen brake light condition.
+ *  The VCU does not send torque commands — the DTI controls its own output. */     */
 #define APPS_DEADZONE_PERCENT           5.0f
 
 /* --- APPS ADC calibration (tune to hardware) ----------------------------- */
@@ -148,10 +151,6 @@ typedef struct {
     float    apps1_percent;          /**< Filtered APPS1 position [%].       */
     float    apps2_percent;          /**< Filtered APPS2 position [%].       */
     float    apps_percent;           /**< Average of both sensors [%].       */
-    float    brake_pressure_percent; /**< Brake pressure scaled [%].         */
-
-    /* --- ETC safety output ----------------------------------------------- */
-    float    final_torque_request;   /**< Safe throttle demand after checks. */
 
     /* --- IMU (MPU-6050 Y-axis) ------------------------------------------ */
     int16_t  accel_y_raw;            /**< Raw 16-bit ADC reading.            */

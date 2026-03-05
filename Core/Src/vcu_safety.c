@@ -202,12 +202,12 @@ void Process_APPS_Safety_Logic(void)
         {
             /*
              * Fault confirmed – 100 ms has elapsed with >10 % deviation.
-             * Rule T11.8.9: cut power immediately, illuminate fault LED.
+             * Rule T11.8.9: illuminate fault LED. The R2D supervisor will
+             * detect apps_fault_active and pull DRIVE_ENABLE LOW immediately.
              */
-            vcu_data.apps_fault_active    = 1;
-            vcu_data.final_torque_request = 0.0f;
+            vcu_data.apps_fault_active = 1;
             HAL_GPIO_WritePin(FAULT_LED_GPIO_Port, FAULT_LED_Pin, GPIO_PIN_SET);
-            return; /* Skip brake and torque-output sections. */
+            return;
         }
         /* else: within grace period – allow torque to continue. */
     }
@@ -281,8 +281,8 @@ void Process_APPS_Safety_Logic(void)
     if (brake_latch == 1)
     {
         /*
-         * Rule EV2.3.2 – Latched. Torque stays at zero regardless of
-         * brake state. Only the throttle returning below 5 % clears this.
+         * Rule EV2.3.2 – Latched. The R2D supervisor holds DRIVE_ENABLE LOW.
+         * Only the throttle returning below 5 % clears this latch.
          */
         if (avg_throttle < BRAKE_RESET_THRESHOLD)
         {
@@ -292,18 +292,12 @@ void Process_APPS_Safety_Logic(void)
         }
         else
         {
-            /* Still above 5 % – keep torque at zero and return. */
-            vcu_data.final_torque_request = 0.0f;
+            /* Still above 5 % – remain latched. */
             return;
         }
     }
-
-    /* ================================================================
-     * STEP 5 – ALL CHECKS PASSED
-     * Output the average pedal position as the torque request.
-     * The inverter CAN TX task (if implemented) reads final_torque_request.
-     * ================================================================ */
-    vcu_data.final_torque_request = avg_throttle;
+    /* All checks passed. No further action needed – the VCU does not send
+     * torque commands. DRIVE_ENABLE state is managed by vR2DLogicTask.     */
 }
 
 /* ============================================================================
@@ -438,11 +432,13 @@ void vBrakeLightTask(void *argument)
 
                 /*
                  * Regen brake light condition:
-                 *   - Throttle must be in deadzone (driver not requesting power)
-                 *   - Deceleration must exceed 1.0 m/s² threshold
+                 *   - Driver is not pressing throttle (both APPS below deadzone)
+                 *   - Measured deceleration exceeds 1.0 m/s² threshold
+                 * The VCU does not command regen; it only detects that the car
+                 * is decelerating without throttle input and lights the brake light.
                  */
                 uint8_t regen_active =
-                    (vcu_data.final_torque_request < APPS_DEADZONE_PERCENT) &&
+                    (vcu_data.apps_percent < APPS_DEADZONE_PERCENT) &&
                     (vcu_data.deceleration_g > BRAKE_DECEL_THRESHOLD_G);
 
                 if (hydraulic_active)
@@ -683,8 +679,8 @@ void vR2DLogicTask(void *argument)
                  * ENABLE INVERTER  (Rule EV4.11.6)
                  *
                  * Drive Enable (PB15) pulled HIGH → DTI inverter enabled.
-                 * The DTI will now accept torque commands from its analog
-                 * pedal inputs (or CAN if configured).
+                 * The DTI manages its own torque curves and pedal mapping
+                 * internally. The VCU's only authority is this pin.
                  * --------------------------------------------------------- */
                 HAL_GPIO_WritePin(DRIVE_ENABLE_GPIO_Port,
                                   DRIVE_ENABLE_Pin, GPIO_PIN_SET);
@@ -695,10 +691,9 @@ void vR2DLogicTask(void *argument)
 
         /*
          * ══════════════════════════ DRIVING ══════════════════════════════
-         * Drive Enable is HIGH. The DTI inverter is active.
-         * No periodic action is needed here – torque requests are handled
-         * by Process_APPS_Safety_Logic (called from vBrakeLightTask), and
-         * fault supervision is handled at the top of this loop.
+         * DRIVE_ENABLE is HIGH. The DTI inverter is active and manages its
+         * own torque output from its internal pedal inputs. The VCU has no
+         * further role here except fault supervision at the top of this loop.
          * ══════════════════════════════════════════════════════════════════
          */
 

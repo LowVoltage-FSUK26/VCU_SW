@@ -98,7 +98,7 @@ extern "C" {
 /** Throttle deadzone for regen brake light detection [%].
  *  If both APPS sensors read below this value the driver is not pressing the
  *  throttle. Used only to qualify the IMU-based regen brake light condition.
- *  The VCU does not send torque commands — the DTI controls its own output. */     */
+ *  The VCU does not send torque commands — the DTI controls its own output. */
 #define APPS_DEADZONE_PERCENT           5.0f
 
 /* --- APPS ADC calibration (tune to hardware) ----------------------------- */
